@@ -44,7 +44,7 @@ impl ReleaseFinderConfig {
         self
     }
 
-    pub fn find_release(self) -> Result<ReleaseManager, minreq::Error> {
+    pub fn find_release(self) -> Result<(Option<ReleaseManager>, Option<ReleaseManager>), minreq::Error> {
         let url = format!("https://api.github.com/repos/{}/{}/releases", self.author, self.repository);
         let request = minreq::Request::new(minreq::Method::Get, url)
             .with_header("Accept", "application/vnd.github.v3+json")
@@ -60,8 +60,11 @@ impl ReleaseFinderConfig {
             Err(e) => return Err(minreq::Error::Other("Failed to parse GitHub JSON Respone!"))
         };
 
+        let mut latest_release = None;
+        let mut latest_prerelease = None;
+
         for release in json_response.into_iter() {
-            if !release["prerelease"].as_bool().expect("GitHub Release JSON Invalid!") || self.allow_prerelease {
+            if self.allow_prerelease && latest_prerelease.is_none() && release["prerelease"].as_bool().expect("GitHub Release JSON Invalid!") {
                 let asset_url = release["assets_url"].as_str().expect("GitHub release assets_url is invalid!");
                 let request = minreq::Request::new(minreq::Method::Get, asset_url)
                     .with_header("Accept", "application/vnd.github.v3+json")
@@ -76,16 +79,43 @@ impl ReleaseFinderConfig {
                     Ok(response) => response,
                     Err(e) => return Err(minreq::Error::Other("Failed to parse GitHub assets JSON response!"))
                 };
-                return Ok(ReleaseManager {
+                latest_prerelease = Some(ReleaseManager {
                     client_name: self.client.clone(),
                     auth_token: self.auth_token.clone(),
                     version_tag: release["tag_name"].as_str().expect("Failed to parse version tag from GitHub release JSON!").to_string(),
                     assets: json_response
                 });
             }
+            
+            if latest_release.is_none() && !release["prerelease"].as_bool().expect("GitHub Release JSON Invalid!") {
+                let asset_url = release["assets_url"].as_str().expect("GitHub release assets_url is invalid!");
+                let request = minreq::Request::new(minreq::Method::Get, asset_url)
+                    .with_header("Accept", "application/vnd.github.v3+json")
+                    .with_header("User-Agent", self.client.as_str());
+                let request = if let Some(token) = self.auth_token.as_ref() {
+                    request.with_header("Authorization", format!("token {}", token).as_str())
+                } else {
+                    request
+                };
+                let response = request.send()?;
+                let json_response: Vec<Value> = match serde_json::from_str(response.as_str()?) {
+                    Ok(response) => response,
+                    Err(e) => return Err(minreq::Error::Other("Failed to parse GitHub assets JSON response!"))
+                };
+                latest_release = Some(ReleaseManager {
+                    client_name: self.client.clone(),
+                    auth_token: self.auth_token.clone(),
+                    version_tag: release["tag_name"].as_str().expect("Failed to parse version tag from GitHub release JSON!").to_string(),
+                    assets: json_response
+                });
+            }
+
+            if latest_release.is_some() && (latest_prerelease.is_some() || !self.allow_prerelease) { 
+                break; 
+            }
         }
 
-        Err(minreq::Error::Other("No valid releases found!"))
+        Ok((latest_release, latest_prerelease))
     }
 }
 
