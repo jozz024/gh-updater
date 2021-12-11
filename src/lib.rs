@@ -57,7 +57,7 @@ impl ReleaseFinderConfig {
         let response = request.send()?;
         let json_response: Vec<Value> = match serde_json::from_str(response.as_str()?) {
             Ok(response) => response,
-            Err(e) => return Err(minreq::Error::Other("Failed to parse GitHub JSON Respone!"))
+            Err(_) => return Err(minreq::Error::Other("Failed to parse GitHub JSON Respone!"))
         };
 
         let mut latest_release = None;
@@ -77,7 +77,7 @@ impl ReleaseFinderConfig {
                 let response = request.send()?;
                 let json_response: Vec<Value> = match serde_json::from_str(response.as_str()?) {
                     Ok(response) => response,
-                    Err(e) => return Err(minreq::Error::Other("Failed to parse GitHub assets JSON response!"))
+                    Err(_) => return Err(minreq::Error::Other("Failed to parse GitHub assets JSON response!"))
                 };
                 latest_prerelease = Some(ReleaseManager {
                     client_name: self.client.clone(),
@@ -100,7 +100,7 @@ impl ReleaseFinderConfig {
                 let response = request.send()?;
                 let json_response: Vec<Value> = match serde_json::from_str(response.as_str()?) {
                     Ok(response) => response,
-                    Err(e) => return Err(minreq::Error::Other("Failed to parse GitHub assets JSON response!"))
+                    Err(_) => return Err(minreq::Error::Other("Failed to parse GitHub assets JSON response!"))
                 };
                 latest_release = Some(ReleaseManager {
                     client_name: self.client.clone(),
