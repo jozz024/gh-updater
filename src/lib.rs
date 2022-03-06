@@ -130,4 +130,43 @@ impl ReleaseManager {
         }
         None
     }
+
+    pub fn get_asset_by_name_with_progress<S: AsRef<str>>(&self, name: S, on_download: impl Fn(usize, usize)) -> Option<Vec<u8>> {
+        for asset in self.assets.iter() {
+            if let Some(asset_name) = asset["name"].as_str() {
+                if asset_name == name.as_ref() {
+                    let request = minreq::Request::new(minreq::Method::Get, asset["url"].as_str().expect("GitHub Asset JSON Invalid!"))
+                        .with_header("Accept", "application/octet-stream")
+                        .with_header("User-Agent", self.client_name.as_str());
+                    let request = if let Some(token) = self.auth_token.as_ref() {
+                        request.with_header("Authorization", format!("token {}", token).as_str())
+                    } else {
+                        request
+                    };
+                    let response = match request.send_lazy() {
+                        Ok(response) => response,
+                        Err(e) => {
+                            println!("{:?}", e);
+                            return None;
+                        }
+                    };
+                    let mut vec = Vec::new();
+                    for (count, result) in response.into_iter().enumerate() {
+                        let (byte, length) = match result {
+                            Ok(res) => res,
+                            Err(e) => {
+                                println!("{:?}", e);
+                                return None;
+                            }
+                        };
+                        on_download(count, length);
+                        vec.reserve(length);
+                        vec.push(byte);
+                    }
+                    return Some(vec)
+                }
+            }
+        }
+        None
+    }
 }
