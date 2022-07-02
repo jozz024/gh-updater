@@ -7,4 +7,4 @@ edition = "2018"
 
 [dependencies]
 minreq = { version = "=2.2.1", features = ["https"] }
-serde_json = "1.0.67"
+serde_json = "1"
