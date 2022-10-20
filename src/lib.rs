@@ -122,6 +122,7 @@ impl ReleaseManager {
                     let mut request: Curler = Curler::new();
                     let mut buffer = Vec::new();
                     let response = match request.get_bytes(asset["url"].to_string(), &mut buffer){
+                    let response = match request.get_bytes(asset["url"].to_string().strip_prefix('"').unwrap().strip_suffix('"').unwrap().to_string(), &mut buffer){
                         Ok(response) => {
                             dbg!(response.clone());
                             &buffer
